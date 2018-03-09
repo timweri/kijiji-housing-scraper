@@ -1,3 +1,4 @@
+import json
 import re
 
 import requests
@@ -27,6 +28,37 @@ class HtmlScraper():
 
 
 class KijijiScraper(HtmlScraper):
+    # fetch all Kijiji subcategories on the given Kijiji page
+    # organize these subcategories into a dict
+    # dump this dict into a JSON file titled <filename>
+    def subcategory_url_fetcher(self, url, filename):
+        page = requests.get(url)
+        html_tree = html.fromstring(page.content)
+
+        urls = html_tree.xpath(
+            '//div[@class="content"]//li//a[@class="category-selected" and @data-event="ChangeCategory"]/@href')
+        urls = list(map(lambda x: "https://www.kijiji.ca" + x, urls))
+        titles = html_tree.xpath(
+            '//div[@class="content"]//li//a[@class="category-selected" and @data-event="ChangeCategory"]/text()')
+        titles = list(map(lambda x: x.strip(), titles))
+        ids = html_tree.xpath(
+            '//div[@class="content"]//li//a[@class="category-selected" and @data-event="ChangeCategory"]/@data-id')
+        ids = list(map(lambda x: int(x.strip()), ids))
+
+        d = dict()
+        d['category'] = []
+
+        for i in range(0, len(urls)):
+            cat = dict()
+            cat['id'] = ids[i]
+            cat['title'] = titles[i]
+            cat['url'] = urls[i]
+            d['category'].append(cat)
+
+        with open(filename, 'w') as fp:
+            json.dump(d, fp)
+        return 0
+
     # parse until the last page of the given url
     def parse_till_end(self):
         while (1):
@@ -137,7 +169,6 @@ class KijijiScraper(HtmlScraper):
             listing.set_title(titles[i])
             listing.set_price(prices[i])
             listing.set_url(urls[i])
-
             listings += [listing]
 
         return listings

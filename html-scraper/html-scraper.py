@@ -1,5 +1,6 @@
 import json
 import re
+from datetime import datetime
 
 import requests
 from listing import Listing
@@ -12,6 +13,8 @@ class HtmlScraper():
         self.cur_url = -1
         self.cur_page = -1
         self.html_tree = -1
+
+        self.out_list = []
 
     def parse_url(self, url, cur_page):
         # save the url
@@ -26,8 +29,122 @@ class HtmlScraper():
         # parse the webpage
         self.html_tree = html.fromstring(page.content)
 
+        # reset output list
+        self.out_list = []
+
 
 class KijijiScraper(HtmlScraper):
+    KIJIJI_URL_PREFIX = 'https://kijiji.ca'
+
+    # parse the individual listing
+    def parse_listing(self, listing_url, listing):
+        # fetch the webpage of individual listing
+        page = requests.get(listing_url)
+
+        # parse the webpage
+        html_tree = html.fromstring(page.content)
+
+        # read all the individual listing attributes
+        listing.set_location(self.get_listing_loc(html_tree))
+        listing.set_bedrooms(self.get_listing_bedroom(html_tree))
+        listing.set_furnished(self.get_listing_furnished(html_tree))
+        listing.set_bathrooms(self.get_listing_bathroom(html_tree))
+        listing.set_petfriendly(self.get_listing_petfriendly(html_tree))
+        listing.set_description(self.get_listing_description(html_tree))
+        listing.set_pubdate(datetime.now())
+
+    # parse the description and return a list of strings
+    def get_listing_description(self, html_tree):
+        desc = html_tree.xpath('//div[@class="descriptionContainer-2832520341"]//div//p/text()')
+        return desc
+
+    # parse the value of "Location" and return a string
+    def get_listing_loc(self, html_tree):
+        loc = html_tree.xpath('//span[@class="address-2932131783"]/text()')
+        if loc:
+            loc = loc[0].strip()
+        else:
+            raise UserWarning("Missing location information.")
+            return -1
+        return loc
+
+    # parse the value of "Pet Friendly" and return an int
+    def get_listing_petfriendly(self, html_tree):
+        petfriendly = html_tree.xpath(
+            '//dl[@class="itemAttribute-304821756" and contains(.,"Pet Friendly")]/dd[@class="attributeValue-1550499923"]/text()')
+        if petfriendly:
+            petfriendly = petfriendly[0].strip()
+        else:
+            return -1
+        if petfriendly == 'No':
+            return 0
+        elif petfriendly == 'Yes':
+            return 1
+        else:
+            raise ValueError('Invalid "Furnished" value.')
+            return -1
+
+    # parse the value of "Furnished" and return an int
+    def get_listing_size(self, html_tree):
+        size = html_tree.xpath(
+            '//dl[@class="itemAttribute-304821756" and contains(.,"Size")]/dd[@class="attributeValue-1550499923"]/text()')
+        if size:
+            size = size[0].strip()
+        else:
+            return -1
+        return int(size)
+
+    # parse the value of "Furnished" and return an int
+    def get_listing_furnished(self, html_tree):
+        furnished = html_tree.xpath(
+            '//dl[@class="itemAttribute-304821756" and contains(.,"Furnished")]/dd[@class="attributeValue-1550499923"]/text()')
+        if furnished:
+            furnished = furnished[0].strip()
+        else:
+            return -1
+        if furnished == 'No':
+            return 0
+        elif furnished == 'Yes':
+            return 1
+        else:
+            raise ValueError('Invalid "Furnished" value.')
+            return -1
+
+    # parse the number of bathrooms and return a float
+    def get_listing_bathroom(self, html_tree):
+        bathroom = html_tree.xpath(
+            '//dl[@class="itemAttribute-304821756" and contains(.,"Bathroom")]/dd[@class="attributeValue-1550499923"]/text()')[
+            0]
+        bathroom = re.search('[0-9.]+', bathroom)
+        if bathroom:
+            return float(bathroom.group(0))
+        else:
+            raise ValueError("Parsing failed for bathroom number.")
+            return -1
+
+    # parse the number of bedrooms and return a float
+    def get_listing_bedroom(self, html_tree):
+        bedroom = html_tree.xpath(
+            '//dl[@class="itemAttribute-304821756" and contains(.,"Bedroom")]/dd[@class="attributeValue-1550499923"]/text()')
+        if bedroom:
+            bedroom = re.search('[0-9.]+', bedroom[0])
+            if bedroom:
+                return float(bedroom.group(0))
+            else:
+                raise ValueError("Parsing failed for bedroom number.")
+                return -1
+        else:
+            return -1
+
+    def parse_all_category(self, filename):
+        self.subcategory_url_fetcher(self.cur_url, filename)
+        with open(filename, 'r') as fp:
+            data = json.load(fp)
+        for url in data['url']:
+            self.parse_url(url, 1)
+            self.par
+
+
     # fetch all Kijiji subcategories on the given Kijiji page
     # organize these subcategories into a dict
     # dump this dict into a JSON file titled <filename>
@@ -65,6 +182,8 @@ class KijijiScraper(HtmlScraper):
             o = self.parse_next_page()
             if o == -1:
                 return 0
+            else:
+                self.get_listings()
 
     # parse the next page of the given url
     def parse_next_page(self):
@@ -156,6 +275,8 @@ class KijijiScraper(HtmlScraper):
             '//div[@class="container-results large-images"]//div[@data-ad-id and @data-vip-url]/@data-vip-url')
         return urls
 
+    # parse all listings on a page
+    # compile all listings into a list of Listing objects.
     def get_listings(self):
         ids = self.get_listingids()
         titles = self.get_postingtitles()
@@ -165,10 +286,12 @@ class KijijiScraper(HtmlScraper):
         listings = []
         for i in range(len(ids)):
             listing = Listing()
-            listing.set_id(ids[i])
-            listing.set_title(titles[i])
-            listing.set_price(prices[i])
-            listing.set_url(urls[i])
+            listing.set_id(str(ids[i]))
+            listing.set_title(str(titles[i]))
+            listing.set_price(str(prices[i]))
+            url = self.KIJIJI_URL_PREFIX + str(urls[i])
+            listing.set_url(url)
+            self.parse_listing(url, listing)
             listings += [listing]
 
         return listings

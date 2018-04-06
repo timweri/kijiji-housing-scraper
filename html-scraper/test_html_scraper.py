@@ -1,3 +1,5 @@
+#!/usr/bin/python3
+
 import unittest
 
 from html_scraper import KijijiScraper

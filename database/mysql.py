@@ -10,6 +10,7 @@ from htmlscraper.listing import Listing
 
 logger = logging.getLogger(__name__)
 
+
 class MySQLConnectionPool:
     FIELDS_DICT = {'id': 'id', 'title': 'title', 'pubdate': 'publish_date',
                    'loc_id': 'location_id', 'addr': 'address', 'bedrooms': 'bedroom_qty',
@@ -43,7 +44,15 @@ class MySQLConnectionPool:
 
         # fill the pool up
         for i in range(size):
-            self._pool.put(MySQLdb.connect(hostaddr, usr, pwd, dbname), block=False)
+            connection = MySQLdb.connect(hostaddr, usr, pwd, dbname)
+
+            # use utf8 encoder
+            connection.set_character_set('utf8')
+            connection.cursor().execute('SET NAMES utf8;')
+            connection.cursor().execute('SET CHARACTER SET utf8;')
+            connection.cursor().execute('SET character_set_connection=utf8;')
+
+            self._pool.put(connection, block=False)
         logger.info('Initialized MySQL connection pool')
 
     # return an available connection from the pool
@@ -84,7 +93,7 @@ class MySQLConnectionPool:
         return 0
 
     # generate sql from a listing
-    def gen_sql_insert(self, listing, cat_id):
+    def _gen_sql_insert(self, listing, cat_id):
         logger.debug('Generating MySQL command for insertion/update for table c{:d}'.format(cat_id))
         if listing.id < 0:
             logger.error('TypeError: id must be non-negative')
@@ -97,36 +106,34 @@ class MySQLConnectionPool:
         sql_cols = """INSERT INTO c{cat_id:d}({id:s}, {url:s}, {loc_id:s}, {title:s}, {pubdate:s}, {desc:s}""".format(
             cat_id=cat_id,
             **self.FIELDS_DICT)
-        sql_vals = """) VALUES ({id:d}, '{url:s}', {loc_id:d}, '{title:s}', '{pubdate:s}', '{desc:s}'""".format(
-            id=listing.id,
-            url=listing.url,
-            loc_id=listing.loc_id,
-            title=listing.title,
-            pubdate=listing.pubdate.strftime(
-                '%Y-%m-%d %H:%M:%S'),
-            desc=listing.description)
+        sql_vals = """) VALUES (%s, %s, %s, %s, %s, %s"""
+        sql_pars = [listing.id, listing.url, listing.loc_id, listing.title,
+                    listing.pubdate.strftime('%Y-%m-%d %H:%M:%S'), listing.description]
 
         col_list = [self.FIELDS_DICT['addr'], self.FIELDS_DICT['price'], self.FIELDS_DICT['bedrooms'],
                     self.FIELDS_DICT['bathrooms'], self.FIELDS_DICT['pet_friendly'], self.FIELDS_DICT['furnished'],
                     self.FIELDS_DICT['urgent'], self.FIELDS_DICT['size']]
-        val_list = [listing.addr, listing.price, listing.bedrooms, listing.bathrooms, listing.pet_friendlly,
-                    listing.furnished, listing.urgent, listing.size]
-        sql_list = [lambda: "'{:s}'".format(listing.addr), lambda: "{:f}".format(listing.price),
-                    lambda: "{:f}".format(listing.bedrooms),
-                    lambda: "{:f}".format(listing.bathrooms), lambda: "{:d}".format(int(listing.pet_friendlly)),
-                    lambda: "{:d}".format(int(listing.furnished)), lambda: "{:d}".format(int(listing.urgent)),
-                    lambda: "{:f}".format(listing.size)]
+        val_list = [listing.addr, listing.price, listing.bedroomqty, listing.bathroomqty, listing.pet_friendly_flag,
+                    listing.furnished_flag, listing.urgent_flag, listing.size]
+
         for i in range(len(col_list)):
             if val_list[i] != -1:
                 sql_cols += ", " + col_list[i]
-                sql_vals += ", " + sql_list[i]()
+                sql_vals += ", %s"
+                sql_pars.append(val_list[i])
 
-        output = sql_cols + sql_vals + ')'
+        cmd = sql_cols + sql_vals + ')'
         logger.debug('MySQL command generation successful')
-        return output
+        return (cmd, sql_pars)
 
     # add a list of listings into an existing table
-    def update_table(self, listings, cat_id):
+    def update_table(self, listings):
+        if not listings:
+            logger.warning('Did not update table. listings is empty.')
+            return 0
+
+        cat_id = listings[0].cat_id
+
         logger.info('Updating table c{} in the MySQL database'.format(cat_id))
         logger.info('Requesting for MySQL connection')
 
@@ -139,9 +146,7 @@ class MySQLConnectionPool:
                 logger.error('Skipping this listing')
                 continue
 
-            logger.debug('Generating SQL command')
-
-            sql = self.gen_sql_insert(l, cat_id)
+            (sql, pars) = self._gen_sql_insert(l, cat_id)
             if sql == -1:
                 # Failed to generate SQL command
                 logger.error('Skipping the listing')
@@ -149,12 +154,15 @@ class MySQLConnectionPool:
 
             try:
                 logger.debug('Executing SQL command')
-                cursor.execute(sql)
+                cursor.execute(sql, pars)
                 logger.debug('Committing changes to the database')
                 db.commit()
                 logger.info('Successfully added a listing to table c{:d}'.format(cat_id))
             except:
                 db.rollback()
+                print(sql)
+                logger.exception('Exception:')
                 logger.error('Failed to add a listing to table c{:d}'.format(cat_id))
+                logger.error('Listing url: {:s}'.format(l.url))
                 logger.error('Rolled back the database changes')
         return 0

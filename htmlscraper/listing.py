@@ -8,58 +8,72 @@ logger = logging.getLogger(__name__)
 
 
 class Listing:
-    def __init__(self):
+    def __init__(self, id=-1, cat_id=-1, loc_id=-1, title=-1, price=-1, url=-1, pubdate=-1, addr=-1, bedroomqty=-1,
+                 bathroomqty=-1, pet_friendly=-1, size=-1, urgent=0, furnished=-1, description=-1):
         # unique id of a posting
-        self._id = -1
+        self._id = id
 
         # unique id of a category
-        self._cat_id = -1
+        self._cat_id = cat_id
 
         # unique id of a location
-        self._loc_id = -1
+        self._loc_id = loc_id
 
         # title of the posting
-        self._title = -1
+        self._title = title
 
         # price of the posting
-        self._price = -1
+        self._price = price
 
         # the listing url
-        self._url = -1
+        self._url = url
 
         # publish date
         # currently derived from the time the listing is scraped
-        self._pubdate = -1
+        self._pubdate = pubdate
 
         # address
         # is a string describing the address
-        self._addr = -1
+        self._addr = addr
 
         # number of bedrooms
-        self._bedroomqty = -1
+        self._bedroomqty = bedroomqty
 
         # number of bathrooms
-        self._bathroomqty = -1
+        self._bathroomqty = bathroomqty
 
         # pet friendly flag
         # whether the place is pet friendly
-        self._pet_friendly_flag = -1
+        self._pet_friendly_flag = pet_friendly
 
         # size of the place, in square
-        self._size = -1
+        self._size = size
 
         # urgent posting flag
-        self._urgent_flag = -1
+        self._urgent_flag = urgent
 
         # furnished flag
         # whether the place is furnished
-        self._furnished_flag = -1
+        self._furnished_flag = furnished
 
         # the description
-        self._description = -1
+        self._description = description
 
     def __repr__(self):
-        pass
+        output = 'Listing:'
+        output += '\nid: {:d}'.format(self.id)
+        output += '\ncat_id: {:d}'.format(self.cat_id)
+        output += '\nloc_id: {:d}'.format(self.loc_id)
+        output += '\ntitle: {:s}'.format(self.title)
+        output += '\nurl: {:s}'.format(self.url)
+        output += '\nprice: {:f}'.format(self.price)
+        output += '\nbedroom quantity: {:f}'.format(self.bedroomqty)
+        output += '\nbathroom quantity: {:f}'.format(self.bathroomqty)
+        output += '\nfurnished: {:b}'.format(self.furnished_flag)
+        output += '\npet friendly: {:b}'.format(self.pet_friendly_flag)
+        output += '\nsize: {:f}'.format(self.size)
+        output += '\ndescription:\n' + self.description
+        return output
 
     def __eq__(self, other):
         return isinstance(other, Listing) and self.id == other.id
@@ -160,11 +174,14 @@ class Listing:
         return self._description
 
     @description.setter
-    def set_description(self, value):
+    def description(self, value):
+        if value == -1:
+            logger.debug('value == -1: description not updated')
+            return
         if type(value) != str:
             logger.error('TypeError: description must be a str')
             raise TypeError('description must be a str')
-        self.description = value
+        self._description = value
 
     @property
     def bedroomqty(self):
@@ -172,6 +189,9 @@ class Listing:
 
     @bedroomqty.setter
     def bedroomqty(self, value):
+        if value == -1:
+            logger.debug('value == -1: bedroomqty not updated')
+            return
         try:
             value + 1
         except TypeError:
@@ -185,6 +205,9 @@ class Listing:
 
     @bathroomqty.setter
     def bathroomqty(self, value):
+        if value == -1:
+            logger.debug('value == -1: bathroomqty not updated')
+            return
         try:
             value + 1
         except TypeError:
@@ -198,6 +221,9 @@ class Listing:
 
     @furnished_flag.setter
     def furnished_flag(self, value):
+        if value == -1:
+            logger.debug('value == -1: furnished_flag not updated')
+            return
         if type(value) != bool:
             logger.error('TypeError: furnished_flag must be a bool')
             raise TypeError('furnished_flag must be a bool')
@@ -209,6 +235,9 @@ class Listing:
 
     @pet_friendly_flag.setter
     def pet_friendly_flag(self, value):
+        if value == -1:
+            logger.debug('value == -1: pet_friendly_flag not updated')
+            return
         if type(value) != bool:
             logger.error('TypeError: pet_friendly_flag must be a bool')
             raise TypeError('pet_friendly_flag must be an bool')

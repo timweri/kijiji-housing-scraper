@@ -46,11 +46,13 @@ class MySQLConnectionPool:
         for i in range(size):
             connection = MySQLdb.connect(hostaddr, usr, pwd, dbname)
 
-            # use utf8 encoder
-            connection.set_character_set('utf8')
-            connection.cursor().execute('SET NAMES utf8;')
-            connection.cursor().execute('SET CHARACTER SET utf8;')
-            connection.cursor().execute('SET character_set_connection=utf8;')
+            # use utf8mb4 encoder
+            # Kijiji description contains utf8 characters that requires
+            # 4 bytes to store
+            connection.set_character_set('utf8mb4')
+            connection.cursor().execute('SET NAMES utf8mb4;')
+            connection.cursor().execute('SET CHARACTER SET utf8mb4;')
+            connection.cursor().execute('SET character_set_connection=utf8mb4;')
 
             self._pool.put(connection, block=False)
         logger.info('Initialized MySQL connection pool')
@@ -160,9 +162,11 @@ class MySQLConnectionPool:
                 logger.info('Successfully added a listing to table c{:d}'.format(cat_id))
             except:
                 db.rollback()
-                print(sql)
                 logger.exception('Exception:')
                 logger.error('Failed to add a listing to table c{:d}'.format(cat_id))
                 logger.error('Listing url: {:s}'.format(l.url))
                 logger.error('Rolled back the database changes')
+
+        self.put_connection(db)
+        logger.info('Released MySQL connection')
         return 0

@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 class KijijiScraper():
-    KIJIJI_URL_PREFIX = 'https://kijiji.ca'
+    KIJIJI_URL_PREFIX = 'kijiji.ca'
 
     def __init__(self):
         # declare class variable
@@ -31,14 +31,14 @@ class KijijiScraper():
 
     # prepare to scrape the category of the given url
     # returns nothing
-    def scrape_cat_ini(self, url):
+    def scrape_cat_page_ini(self, url, page=1):
         if type(url) != str:
             logger.error('TypeError: The url has to be a str')
             raise TypeError('The url has to be a str')
 
         # ini class parameters
         self._cur_url = url
-        self._cur_page = 1
+        self._cur_page = page
 
         # fetch the webpage
         page = requests.get(url)
@@ -322,44 +322,34 @@ class KijijiScraper():
 
         return d
 
-    # parse until the last page of the given url
-    def parse_till_end(self):
-        while (1):
-            o = self.parse_next_page()
-            if o == -1:
-                return 0
-            else:
-                self.get_listings()
-
     # parse the next page of the given url
-    def parse_next_page(self):
+    def scrape_next_page(self):
         # check if the current page is already the last page
-        if self.is_last_page():
-            print('Last page reached\n')
+        if self._is_last_cat_page():
+            logger.info('Last page reached')
             return -1
-        print('Current page: ' + str(self._cur_page + 1) + '\n')
+
+        self._cur_page += 1
+        logger.info('Scraping page number: {:d}'.format(self._cur_page))
 
         # generate the url of the next page
-        nexturl = self.url_page(self._cur_url, self._cur_page + 1)
+        next_url = self._gen_cat_page_url(self._cur_url, self._cur_page)
 
         # parse the generated url
-        self.parse_url(nexturl, self._cur_page + 1)
-
-        return 0
+        self.scrape_cat_page_ini(next_url, self._cur_page)
+        return self.get_cat_page_listings()
 
     # generate url to the specified page
-    def url_page(self, url, page):
-        start = re.search(self.KIJIJI_URL_PREFIX + '/([a-z]|[A-Z]|[-])+/([a-z]|[A-Z]|[-])+/', url)
-        if not start:
-            start = re.search(self.KIJIJI_URL_PREFIX + '/([a-z]|[A-Z]|[-])+/([a-z]|[A-Z]|[-])+/', url)
-
+    def _gen_cat_page_url(self, url, page):
+        start = re.search(self.KIJIJI_URL_PREFIX + '/[a-zA-Z-]+/[a-zA-Z-]+/', url)
         end = re.search('/[a-zA-z0-9]+$', url)
-
-        return start.group(0) + 'page-' + str(page) + end.group(0)
+        print(start)
+        print(end)
+        return 'https://www.{:s}page-{:d}{:s}'.format(start.group(0), page, end.group(0))
 
     # parse the "current ads/max ads"
     # check if current ads == max ads
-    def is_last_page(self):
+    def _is_last_cat_page(self):
         # parsed text will give "Showing <Nat> - <Nat> out of <Nat> Ads"
         text = self._html_tree.xpath('//div[@class="col-2"]//div[@class="top-bar"]//div[@class="showing"]/text()')[
             0].strip()
@@ -370,8 +360,7 @@ class KijijiScraper():
             max = matches[2]
             print(max)
         else:
-            raise ValueError('Page numebr not found')
-            return -1
+            raise ValueError('Page number not found')
 
         return cur == max
 
@@ -381,13 +370,12 @@ class KijijiScraper():
         # extract listing urls into a list of urls
         raws = self._html_tree.xpath(
             '//div[@class="container-results large-images"]//div[@data-ad-id and @data-vip-url]/@data-vip-url')
-        print(raws)
         logger.debug('Category urls extraction successful')
         return raws
 
     # scrape all listings on a category page
     # compile all listings into a list of Listing objects.
-    def get_cat_listings(self):
+    def get_cat_page_listings(self):
         logger.info('Scraping listings from {:s}'.format(self._cur_url))
         # get all the urls on the page
         urls = self.get_cat_urls()
@@ -396,7 +384,7 @@ class KijijiScraper():
         listings = []
 
         for i in range(len(urls)):
-            url = self.KIJIJI_URL_PREFIX + str(urls[i])
+            url = 'https://www.' + self.KIJIJI_URL_PREFIX + str(urls[i])
             listing = self.scrape_listing(url)
             listings += [listing]
             time.sleep(0.5)

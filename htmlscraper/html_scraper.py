@@ -177,32 +177,47 @@ class KijijiScraper():
             logger.error('ValueError: invalid "furnished" attribute value')
             raise ValueError('Invalid "furnished" attribute value')
 
-    # parse the number of bathrooms and return a float
+    # parse the number of bathrooms and return an int identifier
+    # called in listing scraping
     @staticmethod
     def get_listing_bathroomqty(html_tree):
+        value_dict = {'1 bathroom': 1, '1.5 bathrooms': 2, '2 bathrooms': 3, '2.5 bathrooms': 4, '3 bathrooms': 5,
+                      '3.5 bathrooms': 6, '4 bathrooms': 7, '4.5 bathrooms': 8, '5 bathrooms': 9, '5.5 bathrooms': 10,
+                      '6 or more bathrooms': 11}
         raw = html_tree.xpath(
             '//dl[@class="itemAttribute-304821756" and contains(.,"Bathroom")]/dd[@class="attributeValue-1550499923"]/text()')
-        if not raw:
-            logger.debug('"bathroom quantity" attribute not found')
-            return -1
+        if raw:
+            key = raw[0].strip()
+            return value_dict[key]
 
-        value = re.search('[0-9.]+', raw[0])
-        logger.debug('"bathroom quantity" extraction successful')
-        return float(value.group(0))
+        logger.debug('"bathroom quantity" attribute not found')
+        return -1
 
-    # parse the number of bedrooms and return a float
-    # called in listing parsing
+    # parse the number of bedrooms and return an int identifier
+    # called in listing scraping
     @staticmethod
     def get_listing_bedroomqty(html_tree):
+        value_dict = {'1 Bedroom': 1, '1 bedroom': 1, '1 bedroom + den': 2, '1 bedroom and den': 2,
+                      '1 Bedroom + Den': 2, '2 bedrooms': 3, '2 Bedroom': 3, '2 bedrooms and den': 4, '3 Bedroom': 5,
+                      '3 bedrooms': 5, '4 bedrooms': 6, '5 bedrooms': 7, '6 or more bedrooms': 8,
+                      'Bachelor or studio': 9,
+                      '4+ Bedroom': 10, 'Bachelor & Studio': 9}
+        keys = ['1 Bedroom', '1 Bedroom + Den', '2 Bedroom', '3 Bedroom', '4+ Bedroom', 'Bachelor & Studio']
         raw = html_tree.xpath(
             '//dl[@class="itemAttribute-304821756" and contains(.,"Bedroom")]/dd[@class="attributeValue-1550499923"]/text()')
-        if not raw:
-            logger.debug('"bedroom quantity" attribute not found')
-            return -1
+        if raw:
+            key = raw[0].strip()
+            return value_dict[key]
 
-        value = re.search('[0-9.]+', raw[0])
-        logger.debug('"bedroom quantity" extraction successful')
-        return float(value.group(0))
+        raw = html_tree.xpath(
+            '//li[@class="crumbItem-1566965652"]//h1[@class="crumbH1-75073251"]//a[@class="crumbLink-3348846382"]//span[@itemprop="name"]/text()')
+        if raw:
+            for k in keys:
+                if raw[0].find(k) != -1:
+                    return value_dict[k]
+
+        logger.debug('"bedroom quantity" attribute not found')
+        return -1
 
     # get price
     # called in listing parsing
@@ -231,8 +246,9 @@ class KijijiScraper():
             '//h1[@class="title-3283765216"]/text()')
 
         if not raw:
+            print(raw)
             logger.error('title not found')
-            raise ValueError('title not found')
+            return -1
 
         # process the raw strings:
         value = ' '.join(raw)
@@ -269,6 +285,15 @@ class KijijiScraper():
 
         # scrape all the individual listing attributes
         listing.title = self.get_listing_title(html_tree)
+
+        # retry one time if requested data is not properly downloaded
+        if listing.title == -1:
+            logger.info('Re-parsing the listing')
+            html_tree = self.get_html_tree(listing_url)
+            listing.title = self.get_listing_title(html_tree)
+            if listing.title == -1:
+                raise ValueError('title not found')
+
         listing.id = self.get_listing_id(html_tree)
         listing.addr = self.get_listing_addr(html_tree)
         listing.price = self.get_listing_price(html_tree)

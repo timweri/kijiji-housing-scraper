@@ -120,6 +120,9 @@ class Listing:
 
     @title.setter
     def title(self, value):
+        if value == -1:
+            logger.error('title not updated')
+            return
         if type(value) != str:
             logger.error('TypeError: title must be an str')
             raise TypeError('title must be a str')
@@ -190,13 +193,11 @@ class Listing:
     @bedroomqty.setter
     def bedroomqty(self, value):
         if value == -1:
-            logger.debug('value == -1: bedroomqty not updated')
+            logger.debug('bedroomqty not updated')
             return
-        try:
-            value + 1
-        except TypeError:
-            logger.error('TypeError: bedroomqty must be a number')
-            raise TypeError('bedroomqty must be a number')
+        if type(value) != int:
+            logger.error('TypeError: bedroomqty must be an int')
+            raise TypeError('bedroomqty must be an int')
         self._bedroomqty = value
 
     @property
@@ -206,13 +207,11 @@ class Listing:
     @bathroomqty.setter
     def bathroomqty(self, value):
         if value == -1:
-            logger.debug('value == -1: bathroomqty not updated')
+            logger.debug('bathroomqty not updated')
             return
-        try:
-            value + 1
-        except TypeError:
-            logger.error('TypeError: bathroomqty must be a number')
-            raise TypeError('bathroomqty must be a number')
+        if type(value) != int:
+            logger.error('TypeError: bathroomqty must be an int')
+            raise TypeError('bathroomqty must be a int')
         self._bathroomqty = value
 
     @property

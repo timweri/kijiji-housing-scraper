@@ -13,9 +13,9 @@ import requests
 from lxml import html
 
 logging.basicConfig(handlers=[logging.FileHandler('main.log'), logging.StreamHandler(sys.stdout)], level=logging.INFO,
-                    format='%(filename)s: '
-                           '%(levelname)s: '
-                           '%(funcName)s(): '
+                    format='%(filename)8s: '
+                           '%(levelname)8s: '
+                           '%(funcName)25s(): '
                            '%(lineno)d:\t'
                            '%(message)s')
 logger = logging.getLogger(__name__)
@@ -753,13 +753,14 @@ class KijijiHousingBot(KijijiScraper):
         self._connectionpool = MySQLConnectionPool(hostaddr, usr, pwd, dbname, poolsize)
 
     # returns the list of completed Listings objects that are not logged
-    def get_cat_page_listings_with_duplicate_check(self):
+    def get_cat_page_listings(self):
         logger.info('Scraping listings from {:s}'.format(self._cur_url))
 
         # get all listing urls from the page
         urls = self._attempt(self._get_cat_urls, self.MAX_ATTEMPTS)
         # throw error if no listing is found
         if urls == -1:
+            logger.error('No listing is found')
             raise UserWarning('No listing is found')
 
         urls = self._filter_logged_listing(urls)
@@ -791,7 +792,7 @@ class KijijiHousingBot(KijijiScraper):
 
         # parse the generated url
         self.scrape_cat_page_ini(next_url, self._cur_page)
-        return self.get_cat_page_listings_with_duplicate_check()
+        return self.get_cat_page_listings()
 
     # filters out listing that are already logged, using the id entry
     # returns a new list of urls which are not logged
@@ -805,13 +806,21 @@ class KijijiHousingBot(KijijiScraper):
         ids = list(map(lambda x: re.search('(?<=/)[0-9]+$', x)[0], urls))
 
         output = []
+        logged_ids = []
+        unlogged_ids = []
+
         count = 0
         for i in range(len(urls)):
             if not self._is_logged(self.FIELDS_DICT['id'], ids[i], cursor):
                 count += 1
                 output.append(urls[i])
+                unlogged_ids.append(ids[i])
+            else:
+                logged_ids.append(ids[i])
         self._connectionpool.put_connection(connection)
         logger.info('Filtered out {:d}/{:d} logged listings'.format(len(urls) - count, len(urls)))
+        logger.debug('Already logged ids: {:s}'.format(str(logged_ids)))
+        logger.debug('Unlogged ids: {:s}'.format(str(unlogged_ids)))
         return output
 
     # checks if an entry is present in the database

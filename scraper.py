@@ -915,7 +915,7 @@ class KijijiHousingBot(KijijiScraper):
         logger.info('Successfully added {:d}/{:d} listings'.format(count, len(listings)))
         return 0
 
-    def start(self, inputfilename):
+    def start(self, inputfilename='urls.in'):
         while True:
             with open(inputfilename, 'r') as f:
                 for line in f:
@@ -927,5 +927,5 @@ class KijijiHousingBot(KijijiScraper):
 
 
 if __name__ == '__main__':
-    scraper = KijijiHousingBot('localhost', 'root', 'rakion', 'testdb1')
-    scraper.start('urls.in')
+    scraper = KijijiHousingBot('localhost', 'root', 'password', 'testdb1')
+    scraper.start()

@@ -1,6 +1,6 @@
 # Kijiji Housing Scraper
 
-A Python 3.6 automated scraper that scrapes student housing listings on Kijiji (designed and tested only for "Room Rentals & Roommates", "Apartments & Condos for Rent", "House Rental" and "Short Term Rentals" categories) and stores the data on a MySQL server.
+A Python 3 automated scraper that scrapes student housing listings on Kijiji (designed and tested only for "Room Rentals & Roommates", "Apartments & Condos for Rent", "House Rental" and "Short Term Rentals" categories) and stores the data on a MySQL server.
 
 ## Features
 
